@@ -1,30 +1,36 @@
 package com.tarek.gpsapi;
 
-import android.location.Location;
-
 public class User {
 
     private String name;
-    private Location location;
+    private double lat;
+    private double lon;
 
-    public User(String name, Location location){
+    public User(String name, double lat, double lon){
         this.name = name;
-        this.location = location;
+        this.lat = lat;
+        this.lon = lon;
     }
 
     public String getName() {
         return name;
     }
 
-    public Location getLocation(){
-        return location;
-    }
-
     public double getLongitude(){
-        return location.getLongitude();
+        return lat;
     }
 
     public double getLatitude(){
-        return location.getLatitude();
+        return lon;
+    }
+
+    public void updateLocation(double lat, double lon){
+        this.lat = lat;
+        this.lon = lon;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("username: %s, latitude: %f, longitude: %f", name, lat, lon);
     }
 }
