@@ -1,6 +1,7 @@
 package com.tarek.gpsapi;
 
 import android.content.Context;
+import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.Uri;
@@ -14,6 +15,8 @@ import android.view.ViewGroup;
 
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
+
+import java.util.ArrayList;
 
 
 /**
@@ -29,9 +32,9 @@ public class MapViewFragment extends Fragment {
     // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
+    private User privateUser;
+    private ArrayList<User> users;
 
-    LocationManager lm;
-    LocationListener ll;
     MapView mapView;
     GoogleMap map;
 
@@ -39,7 +42,7 @@ public class MapViewFragment extends Fragment {
     private String mParam1;
     private String mParam2;
 
-    private OnFragmentInteractionListener mListener;
+    private OnFragmentInteractionListener mainActivity;
 
     public MapViewFragment() {}
 
@@ -79,8 +82,8 @@ public class MapViewFragment extends Fragment {
 
     // TODO: Rename method, update argument and hook method into UI event
     public void onButtonPressed(Uri uri) {
-        if (mListener != null) {
-            mListener.onFragmentInteraction(uri);
+        if (mainActivity != null) {
+            mainActivity.onFragmentInteraction(uri);
         }
     }
 
@@ -88,7 +91,7 @@ public class MapViewFragment extends Fragment {
     public void onAttach(Context context) {
         super.onAttach(context);
         if (context instanceof OnFragmentInteractionListener) {
-            mListener = (OnFragmentInteractionListener) context;
+            mainActivity = (OnFragmentInteractionListener) context;
         } else {
             throw new RuntimeException(context.toString()
                     + " must implement OnFragmentInteractionListener");
@@ -98,7 +101,8 @@ public class MapViewFragment extends Fragment {
     @Override
     public void onDetach() {
         super.onDetach();
-        mListener = null;
+        mainActivity = null;
+
     }
 
     /**
