@@ -19,6 +19,11 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<RecyclerViewAdapte
         this.users = users;
     }
 
+    public void updateUsers(ArrayList<User> newUsers) {
+        this.users = newUsers;
+        this.notifyDataSetChanged();
+    }
+
     @Override
     public RecyclerViewAdapter.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         Context context = parent.getContext();

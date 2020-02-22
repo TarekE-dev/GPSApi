@@ -14,10 +14,18 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 
+import com.android.volley.AuthFailureError;
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.google.gson.Gson;
 
 import org.json.JSONArray;
@@ -29,8 +37,11 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
-public class MainActivity extends AppCompatActivity implements MapViewFragment.mapViewInterface {
+
+public class MainActivity extends AppCompatActivity implements MapViewFragment.mapViewInterface, RecyclerViewFragment.recyclerFragmentInterface {
 
     private final String SAVED_USERS = "SAVED_USERS";
     private final String SELF = "SELF";
@@ -59,6 +70,8 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
         public boolean handleMessage(@NonNull Message msg) {
             String jsonResponse = (String) msg.obj;
             users = getUsers(jsonResponse);
+            initMapFragment();
+            initRecyclerViewFragment();
             return false;
         }
     });
@@ -79,10 +92,12 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
         users = loadAllUsers();
         if(users == null) {
             callGetUsersAPI(getResources().getString(R.string.getUsersAPI));
+        } else {
+            initMapFragment();
+            initRecyclerViewFragment();
         }
         mapViewFragment = (MapViewFragment) fm.findFragmentByTag(MAP_FRAGMENT);
         recyclerViewFragment = (RecyclerViewFragment) fm.findFragmentByTag(LIST_FRAGMENT);
-        initMapFragment();
 
     }
 
@@ -94,6 +109,17 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
             fm.beginTransaction().remove(mapViewFragment);
             mapViewFragment = MapViewFragment.newInstance(self, users);
             fm.beginTransaction().add(R.id.mapFragmentContainer, mapViewFragment, MAP_FRAGMENT).commit();
+        }
+    }
+
+    private void initRecyclerViewFragment() {
+        if(recyclerViewFragment == null) {
+            recyclerViewFragment = RecyclerViewFragment.newInstance(self, users);
+            fm.beginTransaction().add(R.id.listFragmentContainer, recyclerViewFragment, LIST_FRAGMENT).commit();
+        } else {
+            fm.beginTransaction().remove(recyclerViewFragment);
+            recyclerViewFragment = RecyclerViewFragment.newInstance(self, users);
+            fm.beginTransaction().add(R.id.listFragmentContainer, recyclerViewFragment, LIST_FRAGMENT).commit();
         }
     }
 
@@ -121,6 +147,7 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
                 if(self != null){
                     self.updateLocation(location);
                     saveUser();
+                    addUserAPI(getResources().getString(R.string.postUserAPI));
                 }
             }
 
@@ -193,12 +220,6 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
     }
 
 
-    private void setUp(){
-        for(User user : users) {
-            System.out.println(user.toString());
-        }
-    }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if (grantResults[0] != PackageManager.PERMISSION_GRANTED) {
@@ -207,30 +228,52 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
     }
 
     private void callGetUsersAPI(final String apiURL){
-        new Thread() {
-            @Override
-            public void run(){
-                try {
-                    URL apiToCall = new URL(apiURL);
-                    URLConnection connection = apiToCall.openConnection();
-                    BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                    StringBuilder sb = new StringBuilder();
-                    String currentLine;
-                    while (true){
-                        currentLine = in.readLine();
-                        if(currentLine == null)
-                            break;
-                        sb.append(currentLine);
-                    }
-                    in.close();
-                    Message msg = Message.obtain();
-                    msg.obj = sb.toString();
-                    apiHandler.sendMessage(msg);
-                } catch (Exception e) {
-                    e.printStackTrace();
+        new Thread(() -> {
+            try {
+                URL apiToCall = new URL(apiURL);
+                URLConnection connection = apiToCall.openConnection();
+                BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String currentLine;
+                while (true){
+                    currentLine = in.readLine();
+                    if(currentLine == null)
+                        break;
+                    sb.append(currentLine);
                 }
+                in.close();
+                Message msg = Message.obtain();
+                msg.obj = sb.toString();
+                apiHandler.sendMessage(msg);
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-        }.start();
+        }).start();
+    }
+
+    private void addUserAPI(String apiURL) {
+        RequestQueue requestQueue = Volley.newRequestQueue(getApplicationContext());
+        StringRequest postRequest = new StringRequest(Request.Method.POST, apiURL, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String response) {
+                Log.d("API Response:", response);
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Log.d("API Error:", error.toString());
+            }
+        }) {
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String, String> params = new HashMap<>();
+                params.put("user", self.getName());
+                params.put("latitude", String.valueOf(self.getLatitude()));
+                params.put("longitude", String.valueOf(self.getLongitude()));
+                return params;
+            }
+        };
+        requestQueue.add(postRequest);
     }
 
     private ArrayList<User> getUsers(String jsonResponse) {
