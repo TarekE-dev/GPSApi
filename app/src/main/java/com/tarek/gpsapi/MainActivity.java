@@ -2,6 +2,7 @@ package com.tarek.gpsapi;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.fragment.app.FragmentManager;
 
 import android.Manifest;
 import android.content.SharedPreferences;
@@ -9,11 +10,13 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.util.Log;
+import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 
 import com.google.gson.Gson;
 
@@ -22,14 +25,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements MapViewFragment.mapViewInterface {
 
     private final String SAVED_USERS = "SAVED_USERS";
     private final String SELF = "SELF";
@@ -38,14 +39,18 @@ public class MainActivity extends AppCompatActivity {
     private final String LIST_FRAGMENT = "LIST_FRAGMENT";
 
     private Button nameButton;
+    private EditText nameEdit;
 
     private User self;
     private ArrayList<User> users;
+
+    private FragmentManager fm;
     private MapViewFragment mapViewFragment;
     private RecyclerViewFragment recyclerViewFragment;
 
     private LocationManager lm;
     private LocationListener ll;
+    private Location currentLocation;
 
     private Gson gson = new Gson();
 
@@ -54,8 +59,6 @@ public class MainActivity extends AppCompatActivity {
         public boolean handleMessage(@NonNull Message msg) {
             String jsonResponse = (String) msg.obj;
             users = getUsers(jsonResponse);
-
-            //setUp();
             return false;
         }
     });
@@ -66,31 +69,73 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         if (checkCallingOrSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+        } else {
+            lm = getSystemService(LocationManager.class);
         }
+        fm = getSupportFragmentManager();
+        initListener();
+        setButtonFunction();
+        self = loadUser();
+        users = loadAllUsers();
+        if(users == null) {
+            callGetUsersAPI(getResources().getString(R.string.getUsersAPI));
+        }
+        mapViewFragment = (MapViewFragment) fm.findFragmentByTag(MAP_FRAGMENT);
+        recyclerViewFragment = (RecyclerViewFragment) fm.findFragmentByTag(LIST_FRAGMENT);
+        initMapFragment();
+
+    }
+
+    private void initMapFragment(){
+        if(mapViewFragment == null) {
+            mapViewFragment = MapViewFragment.newInstance(self, users);
+            fm.beginTransaction().add(R.id.mapFragmentContainer, mapViewFragment, MAP_FRAGMENT).commit();
+        } else {
+            fm.beginTransaction().remove(mapViewFragment);
+            mapViewFragment = MapViewFragment.newInstance(self, users);
+            fm.beginTransaction().add(R.id.mapFragmentContainer, mapViewFragment, MAP_FRAGMENT).commit();
+        }
+    }
+
+    private void setButtonFunction() {
+        nameButton = findViewById(R.id.nameButton);
+        nameEdit = findViewById(R.id.nameEdit);
+        nameButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String name = nameEdit.getText().toString();
+                if(self == null) {
+                    self = new User(name, currentLocation.getLatitude(), currentLocation.getLongitude());
+                } else {
+                    self.setName(name);
+                }
+                saveUser();
+            }
+        });
+    }
+
+    private void initListener() {
         ll = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
-
+                if(self != null){
+                    self.updateLocation(location);
+                    saveUser();
+                }
             }
 
             @Override
-            public void onStatusChanged(String provider, int status, Bundle extras) {
-
-            }
+            public void onStatusChanged(String provider, int status, Bundle extras) {}
 
             @Override
-            public void onProviderEnabled(String provider) {
-
-            }
+            public void onProviderEnabled(String provider) {}
 
             @Override
-            public void onProviderDisabled(String provider) {
-
-            }
+            public void onProviderDisabled(String provider) {}
         };
-        callGetUsersAPI(getResources().getString(R.string.getUsersAPI));
-
-
+        if(currentLocation == null && checkCallingOrSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            currentLocation = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+        }
     }
 
     private ArrayList<User> loadAllUsers() {
@@ -219,4 +264,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    @Override
+    public void onFragmentInteraction(Uri uri) {
+
+    }
 }
