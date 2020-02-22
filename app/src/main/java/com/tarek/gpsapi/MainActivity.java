@@ -24,13 +24,16 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity {
 
     private ArrayList<User> users;
+    private MapViewFragment mapViewFragment;
+    private RecyclerViewFragment recyclerViewFragment;
 
     private Handler apiHandler = new Handler(new Handler.Callback() {
         @Override
         public boolean handleMessage(@NonNull Message msg) {
             String jsonResponse = (String) msg.obj;
             users = getUsers(jsonResponse);
-            setUp();
+
+            //setUp();
             return false;
         }
     });
@@ -40,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         callGetUsersAPI(getResources().getString(R.string.getUsersAPI));
+
 
     }
 
