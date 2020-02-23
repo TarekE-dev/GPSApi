@@ -4,17 +4,19 @@ import android.location.Location;
 import android.os.Parcel;
 import android.os.Parcelable;
 
-public class User implements Parcelable {
+public class User implements Parcelable, Comparable<User> {
 
     private String name;
     private double lat;
     private double lon;
+    private Location selfLocation;
     private Location userLocation = new Location("");
 
     protected User(Parcel in) {
         name = in.readString();
         lat = in.readDouble();
         lon = in.readDouble();
+        selfLocation = in.readParcelable(Location.class.getClassLoader());
         userLocation.setLatitude(lat);
         userLocation.setLongitude(lon);
     }
@@ -41,12 +43,14 @@ public class User implements Parcelable {
         parcel.writeString(name);
         parcel.writeDouble(lat);
         parcel.writeDouble(lon);
+        parcel.writeParcelable(selfLocation, flags);
     }
 
-    public User(String name, double lat, double lon){
+    public User(String name, double lat, double lon, Location selfLocation){
         this.name = name;
         this.lat = lat;
         this.lon = lon;
+        this.selfLocation = selfLocation;
         userLocation.setLatitude(lat);
         userLocation.setLongitude(lon);
     }
@@ -58,11 +62,11 @@ public class User implements Parcelable {
     public void setName(String name) { this.name = name; }
 
     public double getLongitude(){
-        return lat;
+        return lon;
     }
 
     public double getLatitude(){
-        return lon;
+        return lat;
     }
 
     public void updateLocation(Location location){
@@ -72,12 +76,25 @@ public class User implements Parcelable {
         userLocation.setLongitude(lon);
     }
 
-    public Location getUserLocation(){
-        return userLocation;
+    public void setSelfLocation(Location selfLocation) {
+        this.selfLocation = selfLocation;
     }
 
-    public double distanceToUser(User other){
-        return userLocation.distanceTo(other.userLocation);
+    public double getDistanceToSelf() {
+        return selfLocation.distanceTo(userLocation);
+    }
+
+    @Override
+    public int compareTo(User o) {
+        double thisDistance = this.getDistanceToSelf();
+        double otherDistance = o.getDistanceToSelf();
+        if(thisDistance < otherDistance) {
+            return -1;
+        } else if(thisDistance == otherDistance) {
+            return 0;
+        } else {
+            return 1;
+        }
     }
 
     @Override

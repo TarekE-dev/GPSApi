@@ -43,12 +43,12 @@ public class MapViewFragment extends Fragment {
 
     public MapViewFragment() {}
 
-    /*
+
     @Override
     public void onStart() {
         super.onStart();
         mapView.onStart();
-    }*/
+    }
 
     @Override
     public void onResume() {
@@ -133,6 +133,10 @@ public class MapViewFragment extends Fragment {
             }
         });
         return view;
+    }
+
+    public void onUsersUpdated(ArrayList<User> users) {
+        this.users = users;
     }
 
     // TODO: Rename method, update argument and hook method into UI event

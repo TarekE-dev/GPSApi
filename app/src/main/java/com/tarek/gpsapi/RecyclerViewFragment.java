@@ -16,6 +16,7 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 
 /**
@@ -35,6 +36,7 @@ public class RecyclerViewFragment extends Fragment {
     private ArrayList<User> users;
 
     RecyclerView recyclerView;
+    RecyclerViewAdapter rva;
 
     private recyclerFragmentInterface mainActivity;
 
@@ -74,13 +76,20 @@ public class RecyclerViewFragment extends Fragment {
         if(users != null) {
             recyclerView = view.findViewById(R.id.recyclerView);
             recyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
-            RecyclerViewAdapter rva = new RecyclerViewAdapter(users);
+            rva = new RecyclerViewAdapter(users);
             recyclerView.setAdapter(rva);
             recyclerView.setItemAnimator(new DefaultItemAnimator());
         } else {
             Log.d("USERS", "users are empty");
         }
         return view;
+    }
+
+    public void onUsersUpdated(ArrayList<User> users){
+        this.users = users;
+        Collections.sort(this.users);
+        if(rva != null)
+            rva.updateUsers(this.users);
     }
 
     // TODO: Rename method, update argument and hook method into UI event

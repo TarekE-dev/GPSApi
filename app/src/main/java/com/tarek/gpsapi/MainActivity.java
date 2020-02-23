@@ -19,11 +19,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 
-import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 import com.google.gson.Gson;
@@ -37,6 +34,7 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -45,7 +43,6 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
 
     private final String SAVED_USERS = "SAVED_USERS";
     private final String SELF = "SELF";
-    private final String USERS = "USERS";
     private final String MAP_FRAGMENT = "MAP_FRAGMENT";
     private final String LIST_FRAGMENT = "LIST_FRAGMENT";
 
@@ -58,6 +55,7 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
     private FragmentManager fm;
     private MapViewFragment mapViewFragment;
     private RecyclerViewFragment recyclerViewFragment;
+    private boolean initialized = false;
 
     private LocationManager lm;
     private LocationListener ll;
@@ -70,16 +68,32 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
         public boolean handleMessage(@NonNull Message msg) {
             String jsonResponse = (String) msg.obj;
             users = getUsers(jsonResponse);
-            initMapFragment();
-            initRecyclerViewFragment();
+            Collections.sort(users);
+            if(!initialized) {
+                initMapFragment();
+                initRecyclerViewFragment();
+                initialized = true;
+            }
+            onUsersUpdated();
             return false;
         }
     });
+
+    private Handler apiCaller = new Handler();
+    private int delay = 30 * 1000;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        apiCaller.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                Log.d("apiCaller", "Calling GET Request");
+                callGetUsersAPI(getResources().getString(R.string.getUsersAPI));
+                apiCaller.postDelayed(this, delay);
+            }
+        }, delay);
         if (checkCallingOrSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
         } else {
@@ -89,16 +103,10 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
         initListener();
         setButtonFunction();
         self = loadUser();
-        users = loadAllUsers();
-        if(users == null) {
-            callGetUsersAPI(getResources().getString(R.string.getUsersAPI));
-        } else {
-            initMapFragment();
-            initRecyclerViewFragment();
-        }
+        System.out.println("Loaded User: " + self.toString());
+        callGetUsersAPI(getResources().getString(R.string.getUsersAPI));
         mapViewFragment = (MapViewFragment) fm.findFragmentByTag(MAP_FRAGMENT);
         recyclerViewFragment = (RecyclerViewFragment) fm.findFragmentByTag(LIST_FRAGMENT);
-
     }
 
     private void initMapFragment(){
@@ -130,25 +138,41 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
             @Override
             public void onClick(View v) {
                 String name = nameEdit.getText().toString();
-                if(self == null) {
-                    self = new User(name, currentLocation.getLatitude(), currentLocation.getLongitude());
-                } else {
-                    self.setName(name);
-                }
+                self = new User(name, currentLocation.getLatitude(), currentLocation.getLongitude(), currentLocation);
                 saveUser();
+                addUserAPI(getResources().getString(R.string.postUserAPI));
             }
         });
+    }
+
+    private void onUsersUpdated() {
+        if(users == null) return;
+        for(User user:users) {
+            user.setSelfLocation(currentLocation);
+        }
+        System.out.println("User: " + self.toString());
+
+        Collections.sort(users);
+        if(recyclerViewFragment != null) {
+            recyclerViewFragment.onUsersUpdated(users);
+        }
+        if(mapViewFragment != null) {
+            mapViewFragment.onUsersUpdated(users);
+        }
     }
 
     private void initListener() {
         ll = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
+                Log.d("LOCATION", "Location changed");
+                currentLocation = location;
                 if(self != null){
-                    self.updateLocation(location);
+                    self.updateLocation(currentLocation);
                     saveUser();
                     addUserAPI(getResources().getString(R.string.postUserAPI));
                 }
+                onUsersUpdated();
             }
 
             @Override
@@ -163,33 +187,7 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
         if(currentLocation == null && checkCallingOrSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             currentLocation = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
         }
-    }
-
-    private ArrayList<User> loadAllUsers() {
-        SharedPreferences sp = getSharedPreferences(SAVED_USERS, MODE_PRIVATE);
-        String jsonUsers = sp.getString(USERS, null);
-        if(jsonUsers == null){
-            return null;
-        }
-        return allUsersFromJson(jsonUsers);
-    }
-
-    private void saveAllUsers() {
-        if(users == null){
-            return;
-        }
-        SharedPreferences sp = getSharedPreferences(SAVED_USERS, MODE_PRIVATE);
-        SharedPreferences.Editor editor = sp.edit();
-        editor.putString(USERS, allUsersToJson(users));
-        editor.commit();
-    }
-
-    private String allUsersToJson(ArrayList<User> listUsers){
-        return gson.toJson(listUsers);
-    }
-
-    private ArrayList<User> allUsersFromJson(String json){
-        return gson.fromJson(json, ArrayList.class);
+        lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 10, ll);
     }
 
     private User loadUser() {
@@ -206,9 +204,7 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
     }
 
     private void saveUser() {
-        if(self == null) {
-            return;
-        }
+        if(self == null) return;
         SharedPreferences sp = getSharedPreferences(SAVED_USERS, MODE_PRIVATE);
         SharedPreferences.Editor editor = sp.edit();
         editor.putString(SELF, userToJson(self));
@@ -253,19 +249,11 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
 
     private void addUserAPI(String apiURL) {
         RequestQueue requestQueue = Volley.newRequestQueue(getApplicationContext());
-        StringRequest postRequest = new StringRequest(Request.Method.POST, apiURL, new Response.Listener<String>() {
+        StringRequest postRequest = new StringRequest(Request.Method.POST, apiURL, response ->
+            {Log.d("API Response:", response); callGetUsersAPI(getResources().getString(R.string.getUsersAPI));},
+                error -> Log.d("API Error:", error.toString())) {
             @Override
-            public void onResponse(String response) {
-                Log.d("API Response:", response);
-            }
-        }, new Response.ErrorListener() {
-            @Override
-            public void onErrorResponse(VolleyError error) {
-                Log.d("API Error:", error.toString());
-            }
-        }) {
-            @Override
-            protected Map<String, String> getParams() throws AuthFailureError {
+            protected Map<String, String> getParams() {
                 Map<String, String> params = new HashMap<>();
                 params.put("user", self.getName());
                 params.put("latitude", String.valueOf(self.getLatitude()));
@@ -296,16 +284,22 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
             double lon = 0;
             try {
                 name = obj.getString("username");
+                if(self.getName().equals(name)) continue;
                 lat = obj.getDouble("latitude");
                 lon = obj.getDouble("longitude");
             } catch (Exception e){
                 e.printStackTrace();
             }
-            tempUsers.add(new User(name, lat, lon));
+            tempUsers.add(new User(name, lat, lon, currentLocation));
         }
         return tempUsers;
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        lm.removeUpdates(ll);
+    }
 
     @Override
     public void onFragmentInteraction(Uri uri) {
