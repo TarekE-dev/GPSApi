@@ -12,12 +12,21 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import com.google.android.gms.maps.CameraUpdate;
+import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.MapsInitializer;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.model.BitmapDescriptor;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 
 /**
@@ -35,6 +44,9 @@ public class MapViewFragment extends Fragment {
     private static final String USERS_PARAM = "USERS_PARAM";
     private User privateUser;
     private ArrayList<User> users;
+
+    private Marker privateMarker;
+    private Map<User, Marker> userMarkerMap;
 
     MapView mapView;
     GoogleMap map;
@@ -120,6 +132,7 @@ public class MapViewFragment extends Fragment {
         mapView = view.findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
         mapView.onResume();
+        userMarkerMap = new HashMap<>();
         try {
             MapsInitializer.initialize(getActivity().getApplicationContext());
         } catch (Exception e) {
@@ -130,6 +143,18 @@ public class MapViewFragment extends Fragment {
             public void onMapReady(GoogleMap googleMap) {
                 map = googleMap;
                 map.setMyLocationEnabled(true);
+                if(privateUser == null) return;
+                LatLng latLng = new LatLng(privateUser.getLatitude(), privateUser.getLongitude());
+                CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 15);
+                map.animateCamera(cameraUpdate);
+                privateMarker = map.addMarker(new MarkerOptions().position(latLng).icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
+                if(users != null) {
+                    for(User user:users) {
+                        LatLng latLng2 = new LatLng(user.getLatitude(), user.getLongitude());
+                        Marker newMarker = map.addMarker(new MarkerOptions().position(latLng2));
+                        userMarkerMap.put(user, newMarker);
+                    }
+                }
             }
         });
         return view;
@@ -137,6 +162,36 @@ public class MapViewFragment extends Fragment {
 
     public void onUsersUpdated(ArrayList<User> users) {
         this.users = users;
+        if(users == null) return;
+        if(map == null) return;
+        if(userMarkerMap == null) userMarkerMap = new HashMap<>();
+        for(User user:this.users) {
+            LatLng latLng = new LatLng(user.getLatitude(), user.getLongitude());
+            if(userMarkerMap.containsKey(user)){
+                userMarkerMap.get(user).setPosition(latLng);
+            } else {
+                Marker newMarker = map.addMarker(new MarkerOptions().position(latLng));
+                userMarkerMap.put(user, newMarker);
+            }
+        }
+        for(User user:userMarkerMap.keySet()){
+            if(!this.users.contains(user)){
+                userMarkerMap.get(user).remove();
+            }
+        }
+    }
+
+    public void onUserUpdated(User selfUpdated) {
+        this.privateUser = selfUpdated;
+        if(map == null) return;
+        LatLng latLng = new LatLng(privateUser.getLatitude(), privateUser.getLongitude());
+        CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 15);
+        map.animateCamera(cameraUpdate);
+        if(privateMarker == null) {
+            privateMarker = map.addMarker(new MarkerOptions().position(latLng).icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
+        } else {
+            privateMarker.setPosition(latLng);
+        }
     }
 
     // TODO: Rename method, update argument and hook method into UI event

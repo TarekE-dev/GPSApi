@@ -74,6 +74,7 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
                 initRecyclerViewFragment();
                 initialized = true;
             }
+            onUserUpdated();
             onUsersUpdated();
             return false;
         }
@@ -103,7 +104,7 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
         initListener();
         setButtonFunction();
         self = loadUser();
-        System.out.println("Loaded User: " + self.toString());
+        if(self != null) setTitle("Welcome, " + self.getName());
         callGetUsersAPI(getResources().getString(R.string.getUsersAPI));
         mapViewFragment = (MapViewFragment) fm.findFragmentByTag(MAP_FRAGMENT);
         recyclerViewFragment = (RecyclerViewFragment) fm.findFragmentByTag(LIST_FRAGMENT);
@@ -114,7 +115,7 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
             mapViewFragment = MapViewFragment.newInstance(self, users);
             fm.beginTransaction().add(R.id.mapFragmentContainer, mapViewFragment, MAP_FRAGMENT).commit();
         } else {
-            fm.beginTransaction().remove(mapViewFragment);
+            fm.beginTransaction().remove(mapViewFragment).commit();
             mapViewFragment = MapViewFragment.newInstance(self, users);
             fm.beginTransaction().add(R.id.mapFragmentContainer, mapViewFragment, MAP_FRAGMENT).commit();
         }
@@ -125,7 +126,7 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
             recyclerViewFragment = RecyclerViewFragment.newInstance(self, users);
             fm.beginTransaction().add(R.id.listFragmentContainer, recyclerViewFragment, LIST_FRAGMENT).commit();
         } else {
-            fm.beginTransaction().remove(recyclerViewFragment);
+            fm.beginTransaction().remove(recyclerViewFragment).commit();
             recyclerViewFragment = RecyclerViewFragment.newInstance(self, users);
             fm.beginTransaction().add(R.id.listFragmentContainer, recyclerViewFragment, LIST_FRAGMENT).commit();
         }
@@ -139,6 +140,7 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
             public void onClick(View v) {
                 String name = nameEdit.getText().toString();
                 self = new User(name, currentLocation.getLatitude(), currentLocation.getLongitude(), currentLocation);
+                setTitle("Welcome, " + self.getName());
                 saveUser();
                 addUserAPI(getResources().getString(R.string.postUserAPI));
             }
@@ -172,7 +174,10 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
                     saveUser();
                     addUserAPI(getResources().getString(R.string.postUserAPI));
                 }
-                onUsersUpdated();
+                if(initialized) {
+                    onUserUpdated();
+                    onUsersUpdated();
+                }
             }
 
             @Override
@@ -188,6 +193,10 @@ public class MainActivity extends AppCompatActivity implements MapViewFragment.m
             currentLocation = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
         }
         lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 10, ll);
+    }
+
+    private void onUserUpdated() {
+        mapViewFragment.onUserUpdated(self);
     }
 
     private User loadUser() {
